@@ -38,12 +38,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const fs = __importStar(require("fs"));
 const index_1 = __importDefault(require("../models/index"));
 const abstractController_1 = __importDefault(require("./abstractController"));
-const { uploadFile, getFileStream } = require("../config/s3");
-const util = require('util');
-const unlinkFile = util.promisify(fs.unlink);
-const multer = require('multer');
-//----------------------------------------------------------------------
-//singleton
+const s3_1 = require("../config/s3");
+const util_1 = __importDefault(require("util"));
+const unlinkFile = util_1.default.promisify(fs.unlink);
+const multer = require("multer");
 class ImagesController extends abstractController_1.default {
     validateBody(type) {
         throw new Error("Method not implemented.");
@@ -55,7 +53,6 @@ class ImagesController extends abstractController_1.default {
         this.instance = new ImagesController("file");
         return this.instance;
     }
-    //----------------------------------------------------------------------
     initRoutes() {
         const setDestination = (req, file, cb) => {
             let destination = `./dist/uploads`;
@@ -67,27 +64,26 @@ class ImagesController extends abstractController_1.default {
                 destination: setDestination,
                 filename: function (req, file, cb) {
                     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-                    const fileName = uniqueSuffix + "-" + req.body.agency_name + "-" + file.originalname;
+                    const fileName = uniqueSuffix + "-" + "-" + file.originalname;
                     console.log(fileName);
                     cb(null, fileName);
                 },
             }),
         });
-        this.router.post("/subirDocumentos", upload.array('file', 3), this.subirDocumentos.bind(this));
+        this.router.post("/subirDocumentos", upload.array("file", 3), this.subirDocumentos.bind(this));
         this.router.get("/verificarDocumentos", this.verificarDocumentos.bind(this));
     }
-    //-----------------------------------------------------------------------------------------------------
     subirDocumentos(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             const files = req.files;
             const imageUrls = [];
             const uploadFiles = () => __awaiter(this, void 0, void 0, function* () {
-                for (const file of files) {
-                    try {
-                        const result = yield uploadFile(file);
+                try {
+                    const uploadPromises = files.map((file) => __awaiter(this, void 0, void 0, function* () {
+                        const result = yield (0, s3_1.uploadFile)(file);
                         console.log(result);
-                        const key = result.key;
-                        const url = getFileStream(key).pipe(res);
+                        const key = result.Key;
+                        const url = (0, s3_1.getFileStream)(key).pipe(res);
                         // Aquí defines si la imagen es válida o no según tus criterios
                         const isValid = false;
                         // Almacenar la key, el parámetro isValid y la URL en la base de datos
@@ -102,31 +98,27 @@ class ImagesController extends abstractController_1.default {
                         yield unlinkFile(file.path);
                         // Agregar la URL al arreglo de imageUrls
                         imageUrls.push(url);
-                    }
-                    catch (error) {
-                        console.error("Error al subir tus documentos", error);
-                        return res.status(500).send("Error en el almacenamiento de los archivos");
-                    }
+                    }));
+                    yield Promise.all(uploadPromises);
+                    return res.json({ images: imageUrls });
                 }
-                return res.json({ images: imageUrls });
+                catch (error) {
+                    console.error("Error al subir tus documentos", error);
+                    return res.status(500).send("Error en el almacenamiento de los archivos");
+                }
             });
             uploadFiles();
         });
     }
-    //----------------------------------------------------------------------
     verificarDocumentos(req, res) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                // Consultar la base de datos para obtener las claves de las imágenes
                 const [results, metadata] = yield index_1.default.sequelize.query(`SELECT image_key, is_valid FROM docsvalidar`, {
                     type: index_1.default.sequelize.QueryTypes.SELECT,
                 });
-                // Recorrer los resultados y obtener las claves de las imágenes
                 const imageKeys = results.map((result) => result.image_key);
-                // Obtener las imágenes desde el servicio de almacenamiento y enviarlas como respuesta
-                const imagePromises = imageKeys.map((key) => getFileStream(key));
+                const imagePromises = imageKeys.map((key) => (0, s3_1.getFileStream)(key));
                 const images = yield Promise.all(imagePromises);
-                // Adjuntar las imágenes a la respuesta
                 images.forEach((image) => image.pipe(res));
             }
             catch (error) {
