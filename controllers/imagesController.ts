@@ -1,3 +1,5 @@
+//Alan Said Martinez Guzman A01746210
+
 import * as fs from "fs";
 import { Request, Response } from "express";
 import db from "../models/index";
@@ -5,6 +7,7 @@ import path from "path";
 import AbstractController from "./abstractController";
 import { uploadFile, getFileStream } from "../config/s3";
 import util from "util";
+
 const unlinkFile = util.promisify(fs.unlink);
 const multer = require("multer");
 
@@ -22,7 +25,7 @@ class ImagesController extends AbstractController {
     this.instance = new ImagesController("file");
     return this.instance;
   }
-
+//-----------------------------------------------------------------------
   protected initRoutes(): void {
     const setDestination = (req: Request, file: any, cb: any) => {
       let destination = `./dist/uploads`;
@@ -55,6 +58,7 @@ class ImagesController extends AbstractController {
     const files = req.files as Express.Multer.File[];
     const imageUrls: string[] = [];
   
+    //------------------------------------------------------------------
     const uploadFiles = async () => {
       try {
         const uploadPromises = files.map(async (file) => {
@@ -68,12 +72,11 @@ class ImagesController extends AbstractController {
   
           // Almacenar la key, el parámetro isValid y la URL en la base de datos
           await db.sequelize.query(
-            `INSERT INTO docsValidar (image_key, is_valid, url) VALUES (:key, :isValid, :url)`,
+            `INSERT INTO docsValidar (key, user) VALUES (:key, :user)`,
             {
               replacements: {
                 key: key,
-                isValid: isValid,
-                url: url,
+                user: req.body.user,
               },
               type: db.sequelize.QueryTypes.INSERT,
             }
@@ -90,19 +93,21 @@ class ImagesController extends AbstractController {
         return res.json({ images: imageUrls });
       } catch (error) {
         console.error("Error al subir tus documentos", error);
-        return res.status(500).send("Error en el almacenamiento de los archivos");
       }
     };
   
     uploadFiles();
   }
-  
+  //--------------------------------------------------------------------
   private async verificarDocumentos(req: Request, res: Response) {
     try {
+      const { email } = req.params;
+
       const [results, metadata] = await db.sequelize.query(
-        `SELECT image_key, is_valid FROM docsvalidar`,
+        `SELECT image_key, is_valid FROM docsvalidar WHERE email = :email`,
         {
           type: db.sequelize.QueryTypes.SELECT,
+          replacements: { email },
         }
       );
 

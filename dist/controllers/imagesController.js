@@ -104,7 +104,6 @@ class ImagesController extends abstractController_1.default {
                 }
                 catch (error) {
                     console.error("Error al subir tus documentos", error);
-                    return res.status(500).send("Error en el almacenamiento de los archivos");
                 }
             });
             uploadFiles();

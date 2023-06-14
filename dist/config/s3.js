@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.getFileStream = exports.uploadFile = void 0;
+//Alan Said Martinez Guzman A01746210
 require("dotenv").config();
 const fs = require("fs");
 const AWS = require("aws-sdk");
